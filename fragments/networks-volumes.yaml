@@ -1,0 +1,13 @@
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+
+networks:
+  backend-db-network:
+    driver: overlay
+    attachable: true
+  frontend-backend-network:
+    driver: overlay
+    attachable: true

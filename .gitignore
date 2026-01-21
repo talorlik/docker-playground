@@ -1,0 +1,10 @@
+# IDE
+.cursor/
+.vscode/
+
+# Data directories
+data/
+db/
+
+# OS
+.DS_Store
