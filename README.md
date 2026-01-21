@@ -1,6 +1,7 @@
 # High Availability Docker Swarm Setup
 
-This setup provides a high availability (HA) configuration using Docker Swarm mode with load balancing, multiple service replicas, and database replication.
+This setup provides a high availability (HA) configuration using Docker Swarm mode
+with load balancing, multiple service replicas, and database replication.
 
 ## Architecture
 
@@ -62,13 +63,16 @@ Legend:
 
 1. **Database Layer**
    - `db-primary`: PostgreSQL primary database (1 replica)
-   - `db-replica`: PostgreSQL read replica (1 replica, requires manual replication setup)
+   - `db-replica`: PostgreSQL read replica (1 replica, requires manual
+   replication setup)
 
 2. **Backend Layer**
-   - `backend`: Backend service with 3 replicas (load balanced by Swarm routing mesh)
+   - `backend`: Backend service with 3 replicas (load balanced by Swarm routing
+   mesh)
 
 3. **Frontend Layer**
-   - `frontend`: Frontend service with 2 replicas (load balanced by Swarm routing mesh)
+   - `frontend`: Frontend service with 2 replicas (load balanced by Swarm routing
+   mesh)
 
 ### Network Isolation
 
@@ -83,7 +87,8 @@ This ensures:
 
 ## Project Structure
 
-This project uses a modular Docker Compose configuration with fragments for better organization and maintainability:
+This project uses a modular Docker Compose configuration with fragments for better
+organization and maintainability:
 
 ```bash
 docker-playground/
@@ -100,7 +105,8 @@ docker-playground/
 
 ### Compose File Fragments
 
-The `docker-compose.yaml` file uses the `include` directive (Docker Compose v2.20+) to merge multiple fragment files:
+The `docker-compose.yaml` file uses the `include` directive (Docker Compose v2.20+)
+to merge multiple fragment files:
 
 - **networks-volumes.yaml**: Defines all shared networks and persistent volumes
 - **databases.yaml**: PostgreSQL primary and read replica configurations
@@ -114,9 +120,18 @@ The `docker-compose.yaml` file uses the `include` directive (Docker Compose v2.2
 - ✅ Better version control - smaller, focused diffs
 - ✅ Reusable fragments across different environments
 
+**Note on Docker Stack Deployment:**
+
+Docker Stack does not support the `include` directive. The `setup.sh` script automatically
+handles this by using `docker compose config` to merge all fragments into a single
+`docker-compose-merged.yaml` file before deploying to Swarm. This merged file is
+generated automatically and should not be committed to version control
+(it's in `.gitignore`).
+
 ## Docker Swarm Features
 
-- **Built-in Load Balancing**: Swarm's routing mesh automatically distributes traffic across replicas
+- **Built-in Load Balancing**: Swarm's routing mesh automatically distributes traffic
+across replicas
 - **Service Discovery**: Services can reach each other by service name
 - **Health Checks**: All services have health check endpoints
 - **Auto-restart**: Services restart automatically on failure
@@ -145,6 +160,7 @@ This script will:
 - Verify Docker installation
 - Initialize Docker Swarm (if not already initialized)
 - Build the backend and frontend images
+- Merge compose fragments into a single file (required for Stack deployment)
 - Deploy the entire stack
 - Wait for services to start
 - Display service status and access information
@@ -189,7 +205,8 @@ Once all services are running, you can access:
 
 ### Adding Worker Nodes (Optional)
 
-The `setup.sh` script automatically displays the worker node join command after initializing the swarm. If you need to get it again later, run:
+The `setup.sh` script automatically displays the worker node join command after
+initializing the swarm. If you need to get it again later, run:
 
 ```bash
 docker swarm join-token worker
@@ -283,8 +300,15 @@ After editing fragments, redeploy the stack:
 # Build updated images
 docker compose build
 
-# Deploy the updated stack
-docker stack deploy -c docker-compose.yaml myapp
+# Merge fragments and deploy the updated stack
+docker compose config > docker-compose-merged.yaml
+docker stack deploy -c docker-compose-merged.yaml myapp
+```
+
+Or simply run the setup script which handles the merging automatically:
+
+```bash
+./setup.sh
 ```
 
 ## Usage
@@ -424,7 +448,8 @@ docker stats
 The PostgreSQL replica requires manual setup. After deploying the stack:
 
 1. The primary database will be initialized with replication user
-2. You'll need to manually configure the replica using `pg_basebackup` or similar tools
+2. You'll need to manually configure the replica using `pg_basebackup` or similar
+tools
 3. For production, consider using managed PostgreSQL services or tools like Patroni
 
 ## Troubleshooting

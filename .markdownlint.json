@@ -1,0 +1,10 @@
+{
+  "no-duplicate-heading": {
+    "siblings_only": true
+  },
+  "line-length": {
+    "code_blocks": false,
+    "tables": false
+  },
+  "no-blanks-blockquote": false
+}

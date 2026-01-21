@@ -8,3 +8,6 @@ db/
 
 # OS
 .DS_Store
+
+# Generated files
+docker-compose-merged.yaml

@@ -3,7 +3,7 @@ services:
   backend:
     image: myapp-backend:latest
     build:
-      context: ./backend
+      context: ../backend
       dockerfile: Dockerfile
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db-primary:5432/myapp

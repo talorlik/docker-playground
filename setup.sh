@@ -57,7 +57,14 @@ echo ""
 
 # Step 4: Deploy the Stack
 echo "Step 4: Deploying the stack..."
-docker stack deploy -c docker-compose.yaml myapp
+echo "Merging compose files..."
+if docker compose version &> /dev/null; then
+    docker compose config > docker-compose-merged.yaml
+else
+    docker-compose config > docker-compose-merged.yaml
+fi
+echo "Deploying to swarm..."
+docker stack deploy -c docker-compose-merged.yaml myapp
 echo "✓ Stack deployed"
 echo ""
 
