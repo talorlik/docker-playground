@@ -63,6 +63,28 @@ if docker compose version &> /dev/null; then
 else
     docker-compose config > docker-compose-merged.yaml
 fi
+
+# Fix CPU and port value formats (Docker Stack requirements)
+echo "Fixing CPU and port value formats..."
+if command -v sed &> /dev/null; then
+    # macOS/BSD sed requires -i with an argument (backup extension)
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Remove 'name' property (not supported by Docker Stack)
+        sed -i '' '/^name:/d' docker-compose-merged.yaml
+        # Fix CPU values to be strings
+        sed -i '' -E 's/cpus: ([0-9.]+)$/cpus: "\1"/g' docker-compose-merged.yaml
+        # Fix port published values to be integers
+        sed -i '' -E 's/published: "([0-9]+)"/published: \1/g' docker-compose-merged.yaml
+    else
+        # Remove 'name' property (not supported by Docker Stack)
+        sed -i '/^name:/d' docker-compose-merged.yaml
+        # Fix CPU values to be strings
+        sed -i -E 's/cpus: ([0-9.]+)$/cpus: "\1"/g' docker-compose-merged.yaml
+        # Fix port published values to be integers
+        sed -i -E 's/published: "([0-9]+)"/published: \1/g' docker-compose-merged.yaml
+    fi
+fi
+
 echo "Deploying to swarm..."
 docker stack deploy -c docker-compose-merged.yaml myapp
 echo "✓ Stack deployed"

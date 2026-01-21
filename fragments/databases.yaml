@@ -15,7 +15,7 @@ services:
         mode: ingress
     volumes:
       - postgres_primary_data:/var/lib/postgresql/data
-      - ./db/primary-init.sh:/docker-entrypoint-initdb.d/init.sh
+      - ../db/primary-init.sh:/docker-entrypoint-initdb.d/init.sh
     command: >
       postgres
       -c wal_level=replica

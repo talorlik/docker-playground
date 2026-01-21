@@ -1,283 +1,180 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import UsersTable from './UsersTable';
+import UserFormModal from './UserFormModal';
+import ToastContainer from './ToastContainer';
 
 function App() {
-  const [formData, setFormData] = useState({
-    name: '',
-    surname: '',
-    sex: '',
-    age: '',
-    email: ''
-  });
-  const [errors, setErrors] = useState({});
-  const [success, setSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-  const validate = () => {
-    const newErrors = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+  // Fetch users from API
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/users`);
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      } else {
+        console.error('Failed to fetch users');
+        showToast('Failed to fetch users', 'error');
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      showToast('Network error. Please try again.', 'error');
+    } finally {
+      setUsersLoading(false);
     }
-
-    if (!formData.surname.trim()) {
-      newErrors.surname = 'Surname is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Email format is invalid';
-    }
-
-    if (formData.age && (isNaN(formData.age) || parseInt(formData.age) < 0 || parseInt(formData.age) > 150)) {
-      newErrors.age = 'Age must be a valid number between 0 and 150';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    setSuccess(false);
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Toast notification helper
+  const showToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type, duration: 3000 }]);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const removeToast = (id) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
 
-    if (!validate()) {
-      return;
-    }
+  // Open modal for adding new user
+  const handleAddClick = () => {
+    setEditingUser(null);
+    setModalOpen(true);
+  };
 
-    setLoading(true);
-    setSuccess(false);
+  // Open modal for editing user
+  const handleEdit = (user) => {
+    setEditingUser(user);
+    setModalOpen(true);
+  };
+
+  // Handle form submission (create or update)
+  const handleFormSubmit = async (formData) => {
+    setFormLoading(true);
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8000'}/api/users`, {
-        method: 'POST',
+      const isEdit = !!editingUser;
+      const url = isEdit 
+        ? `${API_URL}/api/users/${editingUser.id}`
+        : `${API_URL}/api/users`;
+      
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          surname: formData.surname.trim(),
-          email: formData.email.trim(),
-          sex: formData.sex || null,
-          age: formData.age ? parseInt(formData.age) : null
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        if (errorData.errors) {
-          const serverErrors = {};
-          errorData.errors.forEach(err => {
-            if (err.includes('Name')) serverErrors.name = err;
-            else if (err.includes('Surname')) serverErrors.surname = err;
-            else if (err.includes('Email')) serverErrors.email = err;
-            else if (err.includes('Age')) serverErrors.age = err;
-          });
-          setErrors(serverErrors);
-        } else {
-          setErrors({ submit: errorData.error || 'Failed to create user' });
-        }
+        showToast(errorData.error || `Failed to ${isEdit ? 'update' : 'create'} user`, 'error');
         return;
       }
 
-      const user = await response.json();
-      console.log('User created:', user);
-      setSuccess(true);
-      setFormData({
-        name: '',
-        surname: '',
-        sex: '',
-        age: '',
-        email: ''
-      });
+      // Success - refresh table and show toast
+      await fetchUsers();
+      showToast(
+        isEdit 
+          ? `User ${formData.name} ${formData.surname} updated successfully!`
+          : `User ${formData.name} ${formData.surname} added successfully!`,
+        'success'
+      );
+      
+      // Don't close modal - keep it open for adding more users
+      // Only close if editing
+      if (isEdit) {
+        setModalOpen(false);
+        setEditingUser(null);
+      }
     } catch (error) {
-      console.error('Error creating user:', error);
-      setErrors({ submit: 'Network error. Please try again.' });
+      console.error(`Error ${editingUser ? 'updating' : 'creating'} user:`, error);
+      showToast('Network error. Please try again.', 'error');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
+  // Handle delete user
+  const handleDelete = async (userId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        showToast(errorData.error || 'Failed to delete user', 'error');
+        return;
+      }
+
+      // Success - refresh table and show toast
+      await fetchUsers();
+      showToast('User deleted successfully!', 'success');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showToast('Network error. Please try again.', 'error');
+    }
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setEditingUser(null);
+  };
+
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '600px', margin: '0 auto' }}>
-      <h1>Add New User</h1>
-
-      {success && (
-        <div style={{
-          padding: '10px',
-          backgroundColor: '#d4edda',
-          color: '#155724',
-          borderRadius: '4px',
-          marginBottom: '20px',
-          border: '1px solid #c3e6cb'
-        }}>
-          User created successfully!
-        </div>
-      )}
-
-      {errors.submit && (
-        <div style={{
-          padding: '10px',
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          borderRadius: '4px',
-          marginBottom: '20px',
-          border: '1px solid #f5c6cb'
-        }}>
-          {errors.submit}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div>
-          <label htmlFor="name" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Name <span style={{ color: 'red' }}>*</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '16px',
-              border: errors.name ? '2px solid red' : '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          />
-          {errors.name && <span style={{ color: 'red', fontSize: '14px' }}>{errors.name}</span>}
-        </div>
-
-        <div>
-          <label htmlFor="surname" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Surname <span style={{ color: 'red' }}>*</span>
-          </label>
-          <input
-            type="text"
-            id="surname"
-            name="surname"
-            value={formData.surname}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '16px',
-              border: errors.surname ? '2px solid red' : '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          />
-          {errors.surname && <span style={{ color: 'red', fontSize: '14px' }}>{errors.surname}</span>}
-        </div>
-
-        <div>
-          <label htmlFor="email" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Email <span style={{ color: 'red' }}>*</span>
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '16px',
-              border: errors.email ? '2px solid red' : '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          />
-          {errors.email && <span style={{ color: 'red', fontSize: '14px' }}>{errors.email}</span>}
-        </div>
-
-        <div>
-          <label htmlFor="sex" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Sex
-          </label>
-          <select
-            id="sex"
-            name="sex"
-            value={formData.sex}
-            onChange={handleChange}
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '16px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          >
-            <option value="">Select...</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="age" style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Age
-          </label>
-          <input
-            type="number"
-            id="age"
-            name="age"
-            value={formData.age}
-            onChange={handleChange}
-            min="0"
-            max="150"
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '16px',
-              border: errors.age ? '2px solid red' : '1px solid #ccc',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          />
-          {errors.age && <span style={{ color: 'red', fontSize: '14px' }}>{errors.age}</span>}
-        </div>
-
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0 }}>User Management</h1>
         <button
-          type="submit"
-          disabled={loading}
+          onClick={handleAddClick}
           style={{
-            padding: '12px',
+            padding: '12px 24px',
             fontSize: '16px',
-            backgroundColor: loading ? '#ccc' : '#007bff',
+            backgroundColor: '#007bff',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold'
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}
         >
-          {loading ? 'Creating...' : 'Create User'}
+          + Add User
         </button>
-      </form>
+      </div>
+
+      <UsersTable 
+        users={users} 
+        loading={usersLoading}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+
+      <UserFormModal
+        isOpen={modalOpen}
+        onClose={handleCloseModal}
+        onSubmit={handleFormSubmit}
+        user={editingUser}
+        loading={formLoading}
+      />
+
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

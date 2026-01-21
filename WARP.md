@@ -99,6 +99,11 @@ docker stack deploy -c docker-compose-merged.yaml myapp
 The merged file (`docker-compose-merged.yaml`) is in `.gitignore` and regenerated
 on each deployment.
 
+**Important Note**: The `setup.sh` script automatically fixes format incompatibilities between Docker Compose and Docker Stack:
+- Removes the `name` property (not supported by Docker Stack)
+- Converts CPU limits to strings (required by Docker Stack)
+- Converts port numbers to integers (required by Docker Stack)
+
 ### Fragment Files Structure
 
 ```bash

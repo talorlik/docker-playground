@@ -5,8 +5,6 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-    environment:
-      - REACT_APP_API_URL=http://backend:8000
     ports:
       - target: 3000
         published: 3000
