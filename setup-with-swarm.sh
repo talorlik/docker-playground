@@ -14,18 +14,21 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "ERROR: Docker Compose is not installed. Please install Docker Compose first."
+if ! docker compose version &> /dev/null; then
+    echo "ERROR: Docker Compose V2 is not installed. Please install Docker Compose V2 first."
+    echo "Docker Compose V2 is included with Docker Desktop or can be installed as a plugin."
     exit 1
 fi
 
 docker --version
-if docker compose version &> /dev/null; then
-    docker compose version
-else
-    docker-compose --version
-fi
-echo "✓ Docker is installed and ready"
+docker compose version
+echo "✓ Docker and Docker Compose V2 are installed and ready"
+echo ""
+
+# Step 1.5: Render fragment templates
+echo "Step 1.5: Rendering fragment templates for Swarm mode..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/scripts/render-fragments.sh" swarm
 echo ""
 
 # Step 2: Initialize Docker Swarm
@@ -47,22 +50,14 @@ echo ""
 
 # Step 3: Build Docker Images
 echo "Step 3: Building Docker images..."
-if docker compose version &> /dev/null; then
-    docker compose build backend frontend
-else
-    docker-compose build backend frontend
-fi
+docker compose build backend frontend
 echo "✓ Images built successfully"
 echo ""
 
 # Step 4: Deploy the Stack
 echo "Step 4: Deploying the stack..."
 echo "Merging compose files..."
-if docker compose version &> /dev/null; then
-    docker compose config > docker-compose-merged.yaml
-else
-    docker-compose config > docker-compose-merged.yaml
-fi
+docker compose config > docker-compose-merged.yaml
 
 # Fix CPU and port value formats (Docker Stack requirements)
 echo "Fixing CPU and port value formats..."

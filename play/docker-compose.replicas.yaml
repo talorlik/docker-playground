@@ -1,0 +1,42 @@
+# Compose-only: multiple replicas, each with its own host port (no Swarm).
+# Run: docker compose -f docker-compose.replicas.yaml up -d
+#
+# Replicas are separate services so each gets a fixed port:
+#   play-1 -> localhost:9000
+#   play-2 -> localhost:9001
+#   play-3 -> localhost:9002
+#
+# To add replicas: duplicate a block and set the next port (9003, 9004, ...).
+
+x-play-base: &play-base
+  image: play:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment:
+    - FOO=foo
+
+services:
+  play-1:
+    <<: *play-base
+    environment:
+      - FOO=foo
+      - REPLICA_ID=1
+    ports:
+      - "9000:8000"   # host:container (adjust container port if your app differs)
+
+  play-2:
+    <<: *play-base
+    environment:
+      - FOO=foo
+      - REPLICA_ID=2
+    ports:
+      - "9001:8000"
+
+  play-3:
+    <<: *play-base
+    environment:
+      - FOO=foo
+      - REPLICA_ID=3
+    ports:
+      - "9002:8000"

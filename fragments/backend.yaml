@@ -1,3 +1,53 @@
+# Backend Service - Uses YAML anchors for deployment method selection
+# Set DEPLOYMENT_MODE environment variable to 'swarm' or 'proxy'
+
+x-swarm-ports: &swarm-ports
+  ports:
+    - target: 8000
+      published: 8000
+      protocol: tcp
+      mode: ingress
+
+x-proxy-ports: &proxy-ports
+  # No ports exposed - accessed via proxy
+  expose:
+    - "8000"
+
+x-swarm-deploy: &swarm-deploy
+  deploy:
+    replicas: 3
+    placement:
+      constraints:
+        - node.role == manager
+    restart_policy:
+      condition: on-failure
+      delay: 5s
+      max_attempts: 3
+      window: 120s
+    update_config:
+      parallelism: 1
+      delay: 10s
+      failure_action: rollback
+      monitor: 60s
+    rollback_config:
+      parallelism: 1
+      delay: 5s
+      failure_action: pause
+      monitor: 60s
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 512M
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+
+x-proxy-deploy: &proxy-deploy
+  restart: unless-stopped
+  deploy:
+    replicas: 3
+    # Note: Resource limits are not supported in Docker Compose (non-Swarm) mode
+
 services:
   # Backend Service
   backend:
@@ -12,11 +62,7 @@ services:
       - DB_NAME=myapp
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-    ports:
-      - target: 8000
-        published: 8000
-        protocol: tcp
-        mode: ingress
+    <<: *swarm-ports
     networks:
       - backend-db-network
       - frontend-backend-network
@@ -26,30 +72,4 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    deploy:
-      replicas: 3
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-        window: 120s
-      update_config:
-        parallelism: 1
-        delay: 10s
-        failure_action: rollback
-        monitor: 60s
-      rollback_config:
-        parallelism: 1
-        delay: 5s
-        failure_action: pause
-        monitor: 60s
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
+    <<: *swarm-deploy

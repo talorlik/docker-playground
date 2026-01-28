@@ -1,0 +1,38 @@
+services:
+  # Nginx Reverse Proxy for Backend
+  backend-proxy:
+    image: nginx:alpine
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../nginx/backend-lb-compose.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend-backend-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy for Frontend
+  frontend-proxy:
+    image: nginx:alpine
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../nginx/frontend-lb-compose.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend-backend-network
+    depends_on:
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

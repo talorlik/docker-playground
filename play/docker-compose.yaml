@@ -1,0 +1,8 @@
+services:
+  play:
+    image: play:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - FOO=foo

@@ -6,7 +6,8 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 This is a Docker Swarm-based high availability (HA) setup demonstrating load balancing,
 service replication, and database replication. It uses modular Docker Compose fragment
-files that are merged for Swarm deployment.
+files that are merged for Swarm deployment. The project also supports a Proxy deployment
+mode using Docker Compose with nginx reverse proxies.
 
 ## Architecture
 
@@ -27,13 +28,17 @@ Network isolation:
 ### Setup and Deployment
 
 ```bash
-# Complete setup (builds images, initializes swarm, deploys stack)
-./setup.sh
+# Swarm mode setup (builds images, initializes swarm, deploys stack)
+./setup-with-swarm.sh
+
+# Proxy mode setup (builds images, starts services with nginx reverse proxies)
+./setup-with-proxy.sh
 
 # Remove entire stack and clean up resources
 ./remove.sh
 
-# Manual deployment (after editing fragments)
+# Manual Swarm deployment (after editing fragments)
+# Note: Fragments are automatically rendered by setup scripts
 docker compose build
 docker compose config > docker-compose-merged.yaml
 docker stack deploy -c docker-compose-merged.yaml myapp
@@ -88,8 +93,8 @@ docker compose config
 
 ### Important: Docker Stack and Include Directive
 
-Docker Stack does **not** support the `include` directive. The `setup.sh` script
-handles this by merging fragments:
+Docker Stack does **not** support the `include` directive. The `setup-with-swarm.sh`
+script handles this by merging fragments:
 
 ```bash
 docker compose config > docker-compose-merged.yaml
@@ -99,7 +104,9 @@ docker stack deploy -c docker-compose-merged.yaml myapp
 The merged file (`docker-compose-merged.yaml`) is in `.gitignore` and regenerated
 on each deployment.
 
-**Important Note**: The `setup.sh` script automatically fixes format incompatibilities between Docker Compose and Docker Stack:
+**Important Note**: The `setup-with-swarm.sh` script automatically fixes format
+incompatibilities between Docker Compose and Docker Stack:
+
 - Removes the `name` property (not supported by Docker Stack)
 - Converts CPU limits to strings (required by Docker Stack)
 - Converts port numbers to integers (required by Docker Stack)
@@ -107,9 +114,10 @@ on each deployment.
 ### Fragment Files Structure
 
 ```bash
-docker-compose.yaml              # Main file with include directives
+docker-compose.yaml              # Main file with conditional includes (${PROXY_INCLUDE} placeholder)
 fragments/
   ├── networks-volumes.yaml      # Network and volume definitions
+  ├── proxy.yaml                 # Nginx reverse proxies (included conditionally)
   ├── databases.yaml             # PostgreSQL primary and replica
   ├── backend.yaml               # Backend service (3 replicas)
   └── frontend.yaml              # Frontend service (2 replicas)
@@ -119,14 +127,14 @@ fragments/
 
 1. Edit the specific fragment file in `fragments/`
 2. Validate: `docker compose config --quiet`
-3. Redeploy: `./setup.sh` or manually merge and deploy
+3. Redeploy: `./setup-with-swarm.sh` or manually merge and deploy
 
 ### Adding New Services
 
 1. Create a new fragment file: `fragments/your-service.yaml`
-2. Add to `docker-compose.yaml` include list
+2. Add to `docker-compose.yaml` include list (before `${PROXY_INCLUDE}` placeholder for Swarm mode, or after for Proxy mode)
 3. Add to appropriate network(s)
-4. Run `./setup.sh` to deploy
+4. Run `./setup-with-swarm.sh` to deploy
 
 ## Service Details
 

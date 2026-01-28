@@ -92,12 +92,15 @@ organization and maintainability:
 
 ```bash
 docker-playground/
-├── docker-compose.yaml             # Main compose file (uses include)
+├── docker-compose.yaml             # Main compose file (uses conditional includes)
 ├── fragments/                      # Compose fragments
 │   ├── networks-volumes.yaml       # Network and volume definitions
 │   ├── databases.yaml              # PostgreSQL primary and replica
 │   ├── backend.yaml                # Backend service configuration
-│   └── frontend.yaml               # Frontend service configuration
+│   ├── frontend.yaml               # Frontend service configuration
+│   └── proxy.yaml                  # Nginx reverse proxy (proxy mode only)
+├── scripts/
+│   └── render-fragments.sh         # Renders fragments based on deployment mode
 ├── backend/                        # Backend application code
 ├── frontend/                       # Frontend application code
 └── db/                             # Database initialization scripts
@@ -106,12 +109,21 @@ docker-playground/
 ### Compose File Fragments
 
 The `docker-compose.yaml` file uses the `include` directive (Docker Compose v2.20+)
-to merge multiple fragment files:
+to merge multiple fragment files. The include list is **conditionally rendered** based on
+the deployment mode (Swarm or Proxy):
 
 - **networks-volumes.yaml**: Defines all shared networks and persistent volumes
 - **databases.yaml**: PostgreSQL primary and read replica configurations
 - **backend.yaml**: Backend service with 3 replicas
 - **frontend.yaml**: Frontend service with 2 replicas
+- **proxy.yaml**: Nginx reverse proxies (only included in Proxy mode)
+
+**Conditional Includes:**
+
+The `docker-compose.yaml` file uses a `${PROXY_INCLUDE}` placeholder that gets replaced
+by the render script:
+- **Swarm mode**: Placeholder is removed (proxy.yaml not included)
+- **Proxy mode**: Placeholder is replaced with `- fragments/proxy.yaml`
 
 **Benefits:**
 
@@ -119,10 +131,11 @@ to merge multiple fragment files:
 - ✅ Easier to maintain and update individual services
 - ✅ Better version control - smaller, focused diffs
 - ✅ Reusable fragments across different environments
+- ✅ Single compose file for both deployment modes
 
 **Note on Docker Stack Deployment:**
 
-Docker Stack does not support the `include` directive. The `setup.sh` script automatically
+Docker Stack does not support the `include` directive. The `setup-with-swarm.sh` script automatically
 handles this by using `docker compose config` to merge all fragments into a single
 `docker-compose-merged.yaml` file before deploying to Swarm. This merged file is
 generated automatically and should not be committed to version control
@@ -141,7 +154,7 @@ across replicas
 ## Prerequisites
 
 - Docker Engine 20.10 or later
-- Docker Compose 2.20 or later (required for `include` directive)
+- Docker Compose V2 (2.20 or later) - **Required** (V1 is not supported)
 - At least 2GB of available RAM
 - Ports 3000, 8000, and 5432 available
 
@@ -152,7 +165,7 @@ across replicas
 The easiest way to set up everything is to run the all-in-one setup script:
 
 ```bash
-./setup.sh
+./setup-with-swarm.sh
 ```
 
 This script will:
@@ -205,7 +218,7 @@ Once all services are running, you can access:
 
 ### Adding Worker Nodes (Optional)
 
-The `setup.sh` script automatically displays the worker node join command after
+The `setup-with-swarm.sh` script automatically displays the worker node join command after
 initializing the swarm. If you need to get it again later, run:
 
 ```bash
@@ -234,7 +247,7 @@ docker service logs -f myapp_frontend
 
 The following bash scripts are available to help you manage the Docker Swarm setup:
 
-- **`setup.sh`** - Complete all-in-one setup script (recommended)
+- **`setup-with-swarm.sh`** - Complete all-in-one setup script (recommended)
   - Verifies Docker installation
   - Initializes Docker Swarm
   - Builds images
@@ -281,7 +294,7 @@ To add a new service:
 
 1. Create a new fragment file in the `fragments/` directory
 2. Add the service definition
-3. Update `docker-compose.yaml` to include the new fragment:
+3. Update `docker-compose.yaml` to include the new fragment (before `${PROXY_INCLUDE}` placeholder):
 
 ```yaml
 include:
@@ -290,6 +303,7 @@ include:
   - fragments/backend.yaml
   - fragments/frontend.yaml
   - fragments/your-new-service.yaml
+  ${PROXY_INCLUDE}  # Keep placeholder at the end
 ```
 
 ### Deploying Changes
@@ -308,7 +322,7 @@ docker stack deploy -c docker-compose-merged.yaml myapp
 Or simply run the setup script which handles the merging automatically:
 
 ```bash
-./setup.sh
+./setup-with-swarm.sh
 ```
 
 ## Usage

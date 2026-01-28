@@ -45,6 +45,7 @@ services:
         delay: 10s
         failure_action: rollback
         monitor: 60s
+    restart: unless-stopped  # Used by Compose (non-Swarm) mode; Swarm uses deploy.restart_policy
 
   # PostgreSQL Replica Database (Read Replica)
   db-replica:
@@ -84,3 +85,4 @@ services:
         delay: 10s
         failure_action: rollback
         monitor: 60s
+    restart: unless-stopped  # Used by Compose (non-Swarm) mode; Swarm uses deploy.restart_policy

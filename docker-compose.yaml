@@ -1,5 +1,8 @@
+# Docker Compose configuration - Uses conditional includes based on deployment mode
+
 include:
   - fragments/networks-volumes.yaml
   - fragments/databases.yaml
   - fragments/backend.yaml
   - fragments/frontend.yaml
+  - fragments/proxy.yaml
