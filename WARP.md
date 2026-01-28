@@ -4,10 +4,14 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Overview
 
-This is a Docker Swarm-based high availability (HA) setup demonstrating load balancing,
-service replication, and database replication. It uses modular Docker Compose fragment
-files that are merged for Swarm deployment. The project also supports a Proxy deployment
-mode using Docker Compose with nginx reverse proxies.
+This is a Docker-based high availability (HA) setup demonstrating load balancing,
+service replication, and database replication. The project supports **two deployment modes**:
+
+1. **Swarm Mode**: Uses Docker Swarm with overlay networks and built-in load balancing
+2. **Proxy Mode**: Uses Docker Compose with nginx reverse proxies for load balancing
+
+The project uses modular Docker Compose fragment files with YAML anchors and conditional
+rendering to support both deployment modes from a single set of templates.
 
 ## Architecture
 
@@ -22,6 +26,22 @@ Network isolation:
 - `frontend-backend-network`: Frontend ↔ Backend communication only
 - `backend-db-network`: Backend ↔ Database communication only
 - Frontend cannot directly access the database
+
+## Deployment Modes
+
+### Swarm Mode
+- Uses Docker Swarm orchestration
+- Overlay networks for service communication
+- Built-in load balancing via Swarm routing mesh
+- No external load balancers needed
+- Supports multi-node deployments
+
+### Proxy Mode
+- Uses Docker Compose (non-Swarm)
+- Bridge networks for service communication
+- Nginx reverse proxies for load balancing
+- Better for single-host deployments
+- Easier to debug and develop with
 
 ## Key Commands
 
@@ -39,9 +59,15 @@ Network isolation:
 
 # Manual Swarm deployment (after editing fragments)
 # Note: Fragments are automatically rendered by setup scripts
+./scripts/render-fragments.sh swarm
 docker compose build
 docker compose config > docker-compose-merged.yaml
 docker stack deploy -c docker-compose-merged.yaml myapp
+
+# Manual Proxy deployment (after editing fragments)
+./scripts/render-fragments.sh proxy
+docker compose build
+docker compose up -d
 ```
 
 ### Monitoring and Management
@@ -91,6 +117,20 @@ docker compose config
 
 ## Compose Fragment System
 
+### Fragment Template System
+
+The project uses **YAML anchors and aliases** with extension fields (`x-swarm`, `x-proxy`)
+to support both deployment modes from a single set of fragment templates. Fragment files
+are automatically rendered based on the selected deployment mode.
+
+**How it works:**
+1. Fragment templates contain YAML anchors for both modes (e.g., `x-swarm-ports`, `x-proxy-ports`)
+2. Services reference anchors using `*${DEPLOYMENT_MODE}-ports` placeholder pattern
+3. The `render-fragments.sh` script replaces placeholders with actual anchor names
+4. Setup scripts automatically render fragments before deployment
+
+See `TEMPLATES.md` for detailed documentation on the fragment anchor system.
+
 ### Important: Docker Stack and Include Directive
 
 Docker Stack does **not** support the `include` directive. The `setup-with-swarm.sh`
@@ -116,25 +156,32 @@ incompatibilities between Docker Compose and Docker Stack:
 ```bash
 docker-compose.yaml              # Main file with conditional includes (${PROXY_INCLUDE} placeholder)
 fragments/
-  ├── networks-volumes.yaml      # Network and volume definitions
-  ├── proxy.yaml                 # Nginx reverse proxies (included conditionally)
+  ├── networks-volumes.yaml      # Network and volume definitions (uses anchors for overlay/bridge)
   ├── databases.yaml             # PostgreSQL primary and replica
-  ├── backend.yaml               # Backend service (3 replicas)
-  └── frontend.yaml              # Frontend service (2 replicas)
+  ├── backend.yaml               # Backend service (uses anchors for ports/deploy)
+  ├── frontend.yaml              # Frontend service (uses anchors for ports/deploy)
+  └── proxy.yaml                 # Nginx reverse proxies (included only in Proxy mode)
+scripts/
+  └── render-fragments.sh        # Renders fragments based on deployment mode (swarm|proxy)
 ```
 
 ### Editing Fragments
 
-1. Edit the specific fragment file in `fragments/`
-2. Validate: `docker compose config --quiet`
-3. Redeploy: `./setup-with-swarm.sh` or manually merge and deploy
+1. Edit the specific fragment template file in `fragments/`
+2. Render fragments for your deployment mode: `./scripts/render-fragments.sh <swarm|proxy>`
+3. Validate: `docker compose config --quiet`
+4. Redeploy: `./setup-with-swarm.sh` or `./setup-with-proxy.sh` (scripts auto-render)
+
+**Note**: Fragment templates use YAML anchors. Edit the template values, not the rendered
+anchor references. The render script will handle the substitution.
 
 ### Adding New Services
 
 1. Create a new fragment file: `fragments/your-service.yaml`
-2. Add to `docker-compose.yaml` include list (before `${PROXY_INCLUDE}` placeholder for Swarm mode, or after for Proxy mode)
+2. Add to `docker-compose.yaml` include list (before `${PROXY_INCLUDE}` placeholder)
 3. Add to appropriate network(s)
-4. Run `./setup-with-swarm.sh` to deploy
+4. If the service needs mode-specific config, add YAML anchors (see `TEMPLATES.md`)
+5. Run `./setup-with-swarm.sh` or `./setup-with-proxy.sh` to deploy
 
 ## Service Details
 
@@ -143,17 +190,29 @@ fragments/
 - **Port**: 8000
 - **Replicas**: 3
 - **Health endpoint**: `/health`
-- **API endpoints**:
+- **API endpoints** (Full CRUD):
   - `GET /api/users` - List all users
+  - `GET /api/users/:id` - Get single user by ID
   - `POST /api/users` - Create user (validates name, surname, email, optional sex/age)
+  - `PUT /api/users/:id` - Update user by ID
+  - `DELETE /api/users/:id` - Delete user by ID
 - **Database**: Connects to `db-primary` via environment variables
 - **Validation**: Email format, age range (0-150), sex values (male/female/other)
+- **Error Handling**: Returns proper HTTP status codes (404, 409, 500)
 
 ### Frontend (React)
 
 - **Port**: 3000
 - **Replicas**: 2
-- **API URL**: `http://backend:8000` (service discovery)
+- **API URL**: 
+  - Swarm mode: `http://backend:8000` (service discovery)
+  - Proxy mode: `http://backend-proxy:8000` (via nginx proxy)
+- **Features**:
+  - User management UI with full CRUD operations
+  - User table with sorting and filtering
+  - Modal-based user form for create/edit
+  - Toast notifications for success/error feedback
+  - Responsive design
 
 ### Database (PostgreSQL 15)
 
@@ -161,8 +220,22 @@ fragments/
 - **Replica**: Internal only, requires manual replication setup
 - **Credentials**: postgres/postgres
 - **Database**: myapp
-- **Tables**: users (id, name, surname, sex, age, email, created_at)
+- **Tables**: 
+  - users (id, name, surname, sex, age, email, created_at)
+  - Unique constraint on email field
 - **Replication**: WAL-based with replication slot
+
+### Proxy Services (Proxy Mode Only)
+
+- **backend-proxy**: Nginx reverse proxy for backend service
+  - Listens on port 8000
+  - Load balances across backend replicas
+  - Health check: `/health` endpoint
+  
+- **frontend-proxy**: Nginx reverse proxy for frontend service
+  - Listens on port 3000
+  - Load balances across frontend replicas
+  - Health check: root endpoint
 
 ## Placement Constraints
 
@@ -195,8 +268,15 @@ All services have health checks with:
 
 ## Access Points
 
-- **Frontend**: <http://localhost:3000>
-- **Backend API**: <http://localhost:8000>
+### Swarm Mode
+- **Frontend**: <http://localhost:3000> (load balanced via Swarm routing mesh)
+- **Backend API**: <http://localhost:8000> (load balanced via Swarm routing mesh)
+- **Backend Health**: <http://localhost:8000/health>
+- **Database**: localhost:5432 (user: postgres, password: postgres, db: myapp)
+
+### Proxy Mode
+- **Frontend**: <http://localhost:3000> (via frontend-proxy)
+- **Backend API**: <http://localhost:8000> (via backend-proxy)
 - **Backend Health**: <http://localhost:8000/health>
 - **Database**: localhost:5432 (user: postgres, password: postgres, db: myapp)
 
@@ -204,7 +284,11 @@ All services have health checks with:
 
 ### Building and Testing Changes
 
+**Swarm Mode:**
 ```bash
+# Render fragments for Swarm mode
+./scripts/render-fragments.sh swarm
+
 # Build specific service
 docker compose build backend
 docker compose build frontend
@@ -217,8 +301,25 @@ docker stack deploy -c docker-compose-merged.yaml myapp
 docker service ps myapp_backend --no-trunc
 ```
 
+**Proxy Mode:**
+```bash
+# Render fragments for Proxy mode
+./scripts/render-fragments.sh proxy
+
+# Build specific service
+docker compose build backend
+docker compose build frontend
+
+# Restart services
+docker compose up -d
+
+# Verify deployment
+docker compose ps
+```
+
 ### Rolling Updates
 
+**Swarm Mode:**
 ```bash
 # Update with new image
 docker service update --image myapp_backend:new-version myapp_backend
@@ -230,17 +331,37 @@ docker service update --env-add NEW_VAR=value myapp_backend
 docker service update --force myapp_backend
 ```
 
+**Proxy Mode:**
+```bash
+# Update and restart service
+docker compose build backend
+docker compose up -d --no-deps backend
+
+# Scale service
+docker compose up -d --scale backend=5
+```
+
 ### Rollback
 
+**Swarm Mode:**
 ```bash
 # Rollback to previous version
 docker service rollback myapp_backend
+```
+
+**Proxy Mode:**
+```bash
+# Rebuild from previous commit or tag
+git checkout <previous-commit>
+docker compose build backend
+docker compose up -d
 ```
 
 ## Troubleshooting
 
 ### Service Not Starting
 
+**Swarm Mode:**
 ```bash
 # Check service events
 docker service ps myapp_backend --no-trunc
@@ -252,8 +373,21 @@ docker service logs myapp_backend --tail 100
 docker service inspect myapp_backend --pretty
 ```
 
+**Proxy Mode:**
+```bash
+# Check service status
+docker compose ps
+
+# View detailed logs
+docker compose logs backend --tail 100
+
+# Inspect container
+docker compose exec backend sh
+```
+
 ### Network Connectivity Issues
 
+**Swarm Mode:**
 ```bash
 # Verify networks exist
 docker network ls | grep myapp
@@ -263,15 +397,30 @@ docker network inspect myapp_backend-db-network
 docker network inspect myapp_frontend-backend-network
 ```
 
+**Proxy Mode:**
+```bash
+# Verify networks exist
+docker network ls | grep docker-playground
+
+# Check which containers are on which networks
+docker network inspect docker-playground_backend-db-network
+docker network inspect docker-playground_frontend-backend-network
+```
+
 ### Database Connection Issues
 
-- Backend connects to `db-primary` via overlay network
+- Backend connects to `db-primary` via network (overlay in Swarm, bridge in Proxy mode)
 - Check environment variables in `fragments/backend.yaml`
-- Verify database is healthy: `docker service ps myapp_db-primary`
-- Check logs: `docker service logs myapp_db-primary`
+- **Swarm Mode**:
+  - Verify database is healthy: `docker service ps myapp_db-primary`
+  - Check logs: `docker service logs myapp_db-primary`
+- **Proxy Mode**:
+  - Verify database is healthy: `docker compose ps db-primary`
+  - Check logs: `docker compose logs db-primary`
 
 ### Volume Issues
 
+**Swarm Mode:**
 ```bash
 # List volumes
 docker volume ls | grep myapp
@@ -279,6 +428,34 @@ docker volume ls | grep myapp
 # Inspect volume
 docker volume inspect myapp_postgres_primary_data
 ```
+
+**Proxy Mode:**
+```bash
+# List volumes
+docker volume ls | grep docker-playground
+
+# Inspect volume
+docker volume inspect docker-playground_postgres_primary_data
+```
+
+### Switching Between Modes
+
+To switch from one deployment mode to another:
+
+1. **Stop current deployment:**
+   - Swarm: `./remove.sh` or `docker stack rm myapp`
+   - Proxy: `docker compose down`
+
+2. **Render fragments for new mode:**
+   ```bash
+   ./scripts/render-fragments.sh <swarm|proxy>
+   ```
+
+3. **Deploy in new mode:**
+   - Swarm: `./setup-with-swarm.sh`
+   - Proxy: `./setup-with-proxy.sh`
+
+**Note**: Volumes are preserved when switching modes if you don't use `-v` flag.
 
 ## Security Practices
 
@@ -293,7 +470,12 @@ When generating new code:
 ## Notes
 
 - The PostgreSQL replica requires manual setup with `pg_basebackup`
-- Swarm routing mesh provides built-in load balancing (round-robin)
+- **Swarm Mode**: Routing mesh provides built-in load balancing (round-robin)
+- **Proxy Mode**: Nginx proxies provide load balancing
 - Service discovery works via service names (e.g., `backend`, `db-primary`)
 - Network isolation ensures frontend cannot directly access database
-- The merged compose file is auto-generated and should not be committed
+- The merged compose file (`docker-compose-merged.yaml`) is auto-generated and should not be committed
+- Fragment files are rendered based on deployment mode - edit templates, not rendered files
+- Both modes support scaling, but Proxy mode is simpler for single-host development
+- See `TEMPLATES.md` for details on the fragment anchor system
+- See `CHANGELOG.md` for version history and detailed change log
