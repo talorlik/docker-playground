@@ -109,8 +109,8 @@ docker-playground/
 ### Compose File Fragments
 
 The `docker-compose.yaml` file uses the `include` directive (Docker Compose v2.20+)
-to merge multiple fragment files. The include list is **conditionally rendered** based on
-the deployment mode (Swarm or Proxy):
+to merge multiple fragment files. The include list is **conditionally rendered**
+based on the deployment mode (Swarm or Proxy):
 
 - **networks-volumes.yaml**: Defines all shared networks and persistent volumes
 - **databases.yaml**: PostgreSQL primary and read replica configurations
@@ -122,6 +122,7 @@ the deployment mode (Swarm or Proxy):
 
 The `docker-compose.yaml` file uses a `${PROXY_INCLUDE}` placeholder that gets replaced
 by the render script:
+
 - **Swarm mode**: Placeholder is removed (proxy.yaml not included)
 - **Proxy mode**: Placeholder is replaced with `- fragments/proxy.yaml`
 
@@ -135,11 +136,11 @@ by the render script:
 
 **Note on Docker Stack Deployment:**
 
-Docker Stack does not support the `include` directive. The `setup-with-swarm.sh` script automatically
-handles this by using `docker compose config` to merge all fragments into a single
-`docker-compose-merged.yaml` file before deploying to Swarm. This merged file is
-generated automatically and should not be committed to version control
-(it's in `.gitignore`).
+Docker Stack does not support the `include` directive. The `setup-with-swarm.sh`
+script automatically handles this by using `docker compose config` to merge all
+fragments into a single `docker-compose-merged.yaml` file before deploying to Swarm.
+This merged file is generated automatically and should not be committed to version
+control (it's in `.gitignore`).
 
 ## Docker Swarm Features
 
@@ -218,8 +219,8 @@ Once all services are running, you can access:
 
 ### Adding Worker Nodes (Optional)
 
-The `setup-with-swarm.sh` script automatically displays the worker node join command after
-initializing the swarm. If you need to get it again later, run:
+The `setup-with-swarm.sh` script automatically displays the worker node join command
+after initializing the swarm. If you need to get it again later, run:
 
 ```bash
 docker swarm join-token worker
@@ -294,7 +295,8 @@ To add a new service:
 
 1. Create a new fragment file in the `fragments/` directory
 2. Add the service definition
-3. Update `docker-compose.yaml` to include the new fragment (before `${PROXY_INCLUDE}` placeholder):
+3. Update `docker-compose.yaml` to include the new fragment (before `${PROXY_INCLUDE}`
+placeholder):
 
 ```yaml
 include:

@@ -1,12 +1,19 @@
 # Replicas and port assignment: Swarm vs Compose
 
 This document describes how multiple container replicas interact with published
-ports in this project, and the differences between Docker Swarm and Docker Compose V2.
-It answers: (1) why you cannot always "run N replicas and give each its own host port,"
-especially on Docker Desktop (Mac/Windows); (2) how to run multiple replicas with one
-port each when not using Swarm; and (3) port range behavior in Compose V2 and Swarm.
+ports in this project, and the differences between Docker Swarm and
+Docker Compose V2.
 
-**Note:** This project requires Docker Compose V2. Compose V1 is legacy and not supported.
+It answers:
+
+1. Why you cannot always "run N replicas and give each its own host port",
+especially on Docker Desktop (Mac/Windows)?
+2. How to run multiple replicas with one port each when not using Swarm?
+3. Port range behavior in Compose V2 and Swarm.
+
+> [!NOTE]
+>
+> This project requires Docker Compose V2. Compose V1 is legacy and not supported.
 
 **Platform coverage:** Most content applies to **Linux, macOS, and Windows**.
 The main platform-specific differences are in Swarm `mode: host` behavior (section
@@ -266,7 +273,9 @@ gateway port, upstreams = replica service names on the Compose network.
 
 ## 5. Port ranges: Compose V2 vs Swarm
 
-**Note:** This project requires Docker Compose V2. Compose V1 is legacy and not supported.
+> [!NOTE]
+>
+> This project requires Docker Compose V2. Compose V1 is legacy and not supported.
 
 ### 5.1 Compose V2 (current)
 
@@ -290,7 +299,10 @@ in section 3 (container port only, or explicit replica services) are supported.
 
 See: [docker/compose#8878 – Compose V2 – Port Ranges and Scale Behavior Changed](https://github.com/docker/compose/issues/8878).
 
-**Note:** Compose V1 is legacy and not supported by this project. All references to "Compose" in this document refer to Compose V2.
+> [!NOTE]
+>
+> Compose V1 is legacy and not supported by this project.
+> All references to "Compose" in this document refer to Compose V2.
 
 ### 5.3 Swarm with host mode
 

@@ -1,12 +1,16 @@
 # Fragment Anchor System
 
-This project uses YAML anchors and aliases with extension fields (`x-swarm`, `x-proxy`) to conditionally select deployment configurations based on the deployment mode (Swarm or Proxy). Additionally, the main `docker-compose.yaml` file uses conditional includes via a placeholder pattern.
+This project uses YAML anchors and aliases with extension fields (`x-swarm`, `x-proxy`)
+to conditionally select deployment configurations based on the deployment mode
+(Swarm or Proxy). Additionally, the main `docker-compose.yaml` file uses conditional
+includes via a placeholder pattern.
 
 ## How It Works
 
 ### YAML Anchors Pattern
 
-Fragment files use YAML extension fields (`x-`) to define deployment-specific configurations as anchors:
+Fragment files use YAML extension fields (`x-`) to define deployment-specific
+configurations as anchors:
 
 ```yaml
 x-swarm-ports: &swarm-ports
@@ -31,7 +35,8 @@ services:
 
 ### Rendering Script
 
-The `scripts/render-fragments.sh` script replaces anchor references based on deployment mode:
+The `scripts/render-fragments.sh` script replaces anchor references based on
+deployment mode:
 
 ```bash
 # Render for Swarm mode
@@ -41,7 +46,8 @@ The `scripts/render-fragments.sh` script replaces anchor references based on dep
 ./scripts/render-fragments.sh proxy
 ```
 
-The script uses `sed` to replace `*${DEPLOYMENT_MODE}-*` anchor references with the appropriate anchor name (`*swarm-*` or `*proxy-*`).
+The script uses `sed` to replace `*${DEPLOYMENT_MODE}-*` anchor references with
+the appropriate anchor name (`*swarm-*` or `*proxy-*`).
 
 ### Conditional Includes in docker-compose.yaml
 
@@ -57,8 +63,9 @@ include:
 ```
 
 The render script replaces `${PROXY_INCLUDE}`:
+
 - **Swarm mode**: Removes the placeholder line (proxy.yaml not included)
-- **Proxy mode**: Replaces with `  - fragments/proxy.yaml`
+- **Proxy mode**: Replaces with `- fragments/proxy.yaml`
 
 This allows a single `docker-compose.yaml` file to work for both deployment modes.
 
@@ -72,12 +79,14 @@ Both setup scripts automatically render fragments before deployment:
 ## Differences Between Modes
 
 ### Swarm Mode
+
 - Uses `overlay` networks
 - Exposes ports directly (`ports:` with `published:`)
 - Uses `deploy:` sections with Swarm-specific configurations
 - Uses `deploy.restart_policy` for restart behavior
 
 ### Proxy Mode
+
 - Uses `bridge` networks
 - Uses `expose:` instead of `ports:` (no direct host access)
 - Uses `restart: unless-stopped` for restart behavior
@@ -111,11 +120,14 @@ services:
     <<: *${DEPLOYMENT_MODE}-ports
 ```
 
-The render script replaces `*${DEPLOYMENT_MODE}-ports` with either `*swarm-ports` or `*proxy-ports` based on the deployment mode.
+The render script replaces `*${DEPLOYMENT_MODE}-ports` with either `*swarm-ports`
+or `*proxy-ports` based on the deployment mode.
 
-Similarly, the `docker-compose.yaml` file uses a `${PROXY_INCLUDE}` placeholder that gets replaced:
+Similarly, the `docker-compose.yaml` file uses a `${PROXY_INCLUDE}` placeholder
+that gets replaced:
+
 - **Swarm mode**: The placeholder line is removed entirely
-- **Proxy mode**: The placeholder is replaced with `  - fragments/proxy.yaml`
+- **Proxy mode**: The placeholder is replaced with `- fragments/proxy.yaml`
 
 ## Manual Rendering
 
